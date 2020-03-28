@@ -1,0 +1,29 @@
+{
+    "name": "linkapi",
+    "version": "1.0.0",
+    "main": "index.js",
+    "repository": "git@github.com:HenriqueLira1/link-api-test.git",
+    "author": "<henriquelira99@gmail.com>",
+    "license": "MIT",
+    "scripts": {
+        "dev": "nodemon src/server.js",
+        "dev:debug": "nodemon --inspect src/server.js"
+    },
+    "dependencies": {
+        "cors": "^2.8.5",
+        "dotenv": "^8.2.0",
+        "express": "^4.17.1",
+        "express-async-errors": "^3.1.1",
+        "mongoose": "^5.7.8",
+        "youch": "^2.0.10"
+    },
+    "devDependencies": {
+        "eslint": "^6.6.0",
+        "eslint-config-airbnb-base": "^14.0.0",
+        "eslint-config-prettier": "^6.5.0",
+        "eslint-plugin-import": "^2.18.2",
+        "eslint-plugin-prettier": "^3.1.1",
+        "nodemon": "^1.19.4",
+        "prettier": "^1.18.2"
+    }
+}
