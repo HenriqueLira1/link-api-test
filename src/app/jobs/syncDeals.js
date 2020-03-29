@@ -1,10 +1,11 @@
 import 'dotenv/config';
-import '../../database';
-import pipeDriveApi from '../../services/PipeDrive';
-import blingApi from '../../services/Bling';
+import Mongoose from 'mongoose';
 import objectToXML from 'object-to-xml';
-import DealsSchema from '../schemas/Deals';
 import { parseISO, startOfDay, endOfDay } from 'date-fns';
+import '../../database';
+import { getDeals } from '../../services/PipeDrive';
+import DealSchema from '../schemas/Deal';
+import { createPurchaseOrder } from '../../services/Bling';
 
 class SyncDeals {
     constructor() {
@@ -12,61 +13,15 @@ class SyncDeals {
     }
 
     async handle() {
-        //won deals with products associated
-        const deals = await this.getPipeDriveDeals();
+        // get won deals with products associated
+        const deals = await getDeals();
         const XMLDeals = this.parseDealsToXML(deals);
-        this.addBlingPurchaseOrder(XMLDeals);
-
+        await createPurchaseOrder(XMLDeals);
         await this.persistDeals(deals);
     }
 
-    async getPipeDriveDeals() {
-        try {
-            const {
-                data: { data: deals },
-            } = await pipeDriveApi.get('deals', {
-                params: {
-                    api_token: process.env.PIPEDRIVE_API_KEY,
-                    status: 'won',
-                },
-            });
-
-            //get deals products
-            return await Promise.all(
-                deals
-                    .filter(deal => {
-                        //check if deal has products associated
-                        return deal.products_count > 0;
-                    })
-                    .map(async deal => {
-                        deal.products = await this.getDealProducts(deal);
-                        return deal;
-                    })
-            );
-        } catch (error) {
-            console.error("Couldn't reach PipeDrive API");
-        }
-    }
-
-    async getDealProducts(deal) {
-        try {
-            const {
-                data: { data: products },
-            } = await pipeDriveApi.get(`deals/${deal.id}/products`, {
-                params: {
-                    api_token: process.env.PIPEDRIVE_API_KEY,
-                },
-            });
-
-            return products;
-        } catch (error) {
-            console.error("Couldn't reach PipeDrive API");
-            return [];
-        }
-    }
-
     parseDealsToXML(deals) {
-        //got only essential data to generate xml
+        // got only essential data to generate xml
         return deals.map(deal => {
             return objectToXML({
                 raiz: {
@@ -90,48 +45,37 @@ class SyncDeals {
         });
     }
 
-    async addBlingPurchaseOrder(XMLDeals) {
-        await Promise.all(
-            XMLDeals.map(async XMLDeal => {
-                try {
-                    await blingApi.post(`pedido/json`, null, {
-                        params: {
-                            apikey: process.env.BLING_API_KEY,
-                            xml: XMLDeal,
-                        },
-                    });
-                    return;
-                } catch (error) {
-                    console.error("Couldn't reach Bling API");
-                    return;
-                }
-            })
-        );
-    }
-
     async persistDeals(deals) {
         await Promise.all(
             deals.map(async deal => {
                 const wonTime = parseISO(deal.won_time);
 
-                //search for existing deals collection for deal won time
-                const dealsCollection = await DealsSchema.findOne({
+                // search for existing deals collection
+                const dealsCollection = await DealSchema.findOne({
                     date: {
                         $gte: startOfDay(wonTime),
                         $lt: endOfDay(wonTime),
                     },
                 });
 
-                //if there are matching deals collection, attach deal
+                // if there are matching deals collection, attach deal
                 if (dealsCollection) {
-                    await dealsCollection.update({
-                        deals: [...dealsCollection.deals, deal],
-                        total_value:
-                            Number(deal.value) + dealsCollection.total_value,
-                    });
+                    // check if deal has already been saved
+                    const isDealSaved = dealsCollection.deals.find(
+                        currentDeal => currentDeal.id === deal.id
+                    );
+
+                    if (!isDealSaved) {
+                        await dealsCollection.updateOne({
+                            deals: [...dealsCollection.deals, deal],
+                            total_value:
+                                Number(deal.value) +
+                                dealsCollection.total_value,
+                        });
+                    }
                 } else {
-                    //if there are not matching deals collections, create a new one
-                    DealsSchema.create({
+                    // if there are no matching deals collection, create a new one
+                    DealSchema.create({
                         date: wonTime,
                         deals: [deal],
                         total_value: Number(deal.value),
@@ -139,6 +83,7 @@ class SyncDeals {
                 }
             })
         );
+        Mongoose.connection.close();
     }
 }
 
