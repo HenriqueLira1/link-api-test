@@ -6,8 +6,7 @@
     "author": "<henriquelira99@gmail.com>",
     "license": "MIT",
     "scripts": {
-        "dev": "nodemon src/server.js",
-        "dev:debug": "nodemon --inspect src/server.js",
+        "start": "nodemon src/server.js",
         "syncDeals": "sucrase-node src/app/jobs/syncDeals.js"
     },
     "dependencies": {
