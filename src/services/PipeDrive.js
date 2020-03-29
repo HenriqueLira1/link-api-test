@@ -1,7 +1,7 @@
 import axios from 'axios';
 
-const api = axios.create({
-    baseURL: 'http://localhost:3333',
+const pipeDriveApi = axios.create({
+    baseURL: 'https://api.pipedrive.com/v1/',
 });
 
-export default api;
+export default pipeDriveApi;
