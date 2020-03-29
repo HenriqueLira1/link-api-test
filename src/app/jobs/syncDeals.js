@@ -1,7 +1,10 @@
 import 'dotenv/config';
+import '../../database';
 import pipeDriveApi from '../../services/PipeDrive';
 import blingApi from '../../services/Bling';
 import objectToXML from 'object-to-xml';
+import DealsSchema from '../schemas/Deals';
+import { parseISO, startOfDay, endOfDay } from 'date-fns';
 
 class SyncDeals {
     constructor() {
@@ -13,6 +16,8 @@ class SyncDeals {
         const deals = await this.getPipeDriveDeals();
         const XMLDeals = this.parseDealsToXML(deals);
         this.addBlingPurchaseOrder(XMLDeals);
+
+        await this.persistDeals(deals);
     }
 
     async getPipeDriveDeals() {
@@ -95,8 +100,42 @@ class SyncDeals {
                             xml: XMLDeal,
                         },
                     });
+                    return;
                 } catch (error) {
                     console.error("Couldn't reach Bling API");
+                    return;
+                }
+            })
+        );
+    }
+
+    async persistDeals(deals) {
+        await Promise.all(
+            deals.map(async deal => {
+                const wonTime = parseISO(deal.won_time);
+
+                //search for existing deals collection for deal won time
+                const dealsCollection = await DealsSchema.findOne({
+                    date: {
+                        $gte: startOfDay(wonTime),
+                        $lt: endOfDay(wonTime),
+                    },
+                });
+
+                //if there are matching deals collection, attach deal
+                if (dealsCollection) {
+                    await dealsCollection.update({
+                        deals: [...dealsCollection.deals, deal],
+                        total_value:
+                            Number(deal.value) + dealsCollection.total_value,
+                    });
+                } else {
+                    //if there are not matching deals collections, create a new one
+                    DealsSchema.create({
+                        date: wonTime,
+                        deals: [deal],
+                        total_value: Number(deal.value),
+                    });
                 }
             })
         );

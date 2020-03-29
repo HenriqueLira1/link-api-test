@@ -1,9 +1,9 @@
 import { Router } from 'express';
 
-import UserController from './app/controllers/UserController';
+import DealController from './app/controllers/DealController';
 
 const routes = new Router();
 
-routes.post('/users', UserController.store);
+routes.get('/deals', DealController.index);
 
 export default routes;
