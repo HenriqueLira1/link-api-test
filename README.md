@@ -1,5 +1,8 @@
 # Integração Pipedrive e Bling - LinkApi
 
+Para iniciar o projeto, crie o arquivo de ambiente `.env` e o preencha seguindo o exemplo do arquivo `.env.example`
+Instale as dependências do projeto com o comando `yarn`
+
 ## Sicronizar as plataformas e popular banco MongoDB
 
 Para rodar o script de sincronização utilize o comando `yarn syncDeals`
