@@ -13,10 +13,16 @@ class SyncDeals {
     }
 
     async handle() {
-        // get won deals with products associated
+        // get won deals with products associated from piedrive
         const deals = await getDeals();
+
+        // convert deals to xml format to export to bling
         const XMLDeals = this.parseDealsToXML(deals);
+
+        // create bling purchase orders with pipedrive data
         await createPurchaseOrder(XMLDeals);
+
+        // persist deals to mongoDB
         await this.persistDeals(deals);
     }
 
@@ -46,43 +52,41 @@ class SyncDeals {
     }
 
     async persistDeals(deals) {
-        await Promise.all(
-            deals.map(async deal => {
-                const wonTime = parseISO(deal.won_time);
+        for (const deal of deals) {
+            const wonTime = parseISO(deal.won_time);
 
-                // search for existing deals collection
-                const dealsCollection = await DealSchema.findOne({
-                    date: {
-                        $gte: startOfDay(wonTime),
-                        $lt: endOfDay(wonTime),
-                    },
-                });
+            // search for existing deals collection
+            const dealsCollection = await DealSchema.findOne({
+                date: {
+                    $gte: startOfDay(wonTime),
+                    $lt: endOfDay(wonTime),
+                },
+            });
 
-                // if there are matching deals collection, attach deal
-                if (dealsCollection) {
-                    // check if deal has already been saved
-                    const isDealSaved = dealsCollection.deals.find(
-                        currentDeal => currentDeal.id === deal.id
-                    );
+            // if there are matching deals collection, attach deal
+            if (dealsCollection) {
+                // check if deal has already been saved
+                const isDealSaved = dealsCollection.deals.find(
+                    currentDeal => currentDeal.id === deal.id
+                );
 
-                    if (!isDealSaved) {
-                        await dealsCollection.updateOne({
-                            deals: [...dealsCollection.deals, deal],
-                            total_value:
-                                Number(deal.value) +
-                                dealsCollection.total_value,
-                        });
-                    }
-                } else {
-                    // if there are no matching deals collection, create a new one
-                    DealSchema.create({
-                        date: wonTime,
-                        deals: [deal],
-                        total_value: Number(deal.value),
+                if (!isDealSaved) {
+                    await dealsCollection.updateOne({
+                        deals: [...dealsCollection.deals, deal],
+                        total_value:
+                            Number(deal.value) + dealsCollection.total_value,
                     });
                 }
-            })
-        );
+            } else {
+                // if there are no matching deals collection, create a new one
+                await DealSchema.create({
+                    date: wonTime,
+                    deals: [deal],
+                    total_value: Number(deal.value),
+                });
+            }
+        }
+
         Mongoose.connection.close();
     }
 }
