@@ -10,7 +10,7 @@
         "syncDeals": "sucrase-node src/app/jobs/syncDeals.js"
     },
     "dependencies": {
-        "axios": "^0.19.2",
+        "axios": "^0.21.1",
         "cors": "^2.8.5",
         "date-fns": "^2.11.1",
         "dotenv": "^8.2.0",
